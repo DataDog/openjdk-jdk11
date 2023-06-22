@@ -49,7 +49,7 @@ class TestVerifySilentlyRunSystemGC {
 public class TestVerifySilently {
 
   private static OutputAnalyzer runTest(boolean verifySilently) throws Exception {
-    ArrayList<String> vmOpts = new ArrayList();
+    ArrayList<String> vmOpts = new ArrayList<>();
 
     Collections.addAll(vmOpts, Utils.getFilteredTestJavaOpts("-Xlog.*"));
     Collections.addAll(vmOpts, new String[] {"-XX:+UnlockDiagnosticVMOptions",
@@ -58,8 +58,7 @@ public class TestVerifySilently {
                                              "-XX:+VerifyAfterGC",
                                              (verifySilently ? "-Xlog:gc":"-Xlog:gc+verify=debug"),
                                              TestVerifySilentlyRunSystemGC.class.getName()});
-    ProcessBuilder pb =
-      ProcessTools.createJavaProcessBuilder(vmOpts.toArray(new String[vmOpts.size()]));
+    ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(vmOpts);
     OutputAnalyzer output = new OutputAnalyzer(pb.start());
 
     System.out.println("Output:\n" + output.getOutput());

@@ -372,9 +372,9 @@ void Thread::call_run() {
   // At this point, Thread object should be fully initialized and
   // Thread::current() should be set.
 
-  register_thread_stack_with_NMT();
-
   MACOS_AARCH64_ONLY(this->init_wx());
+
+  register_thread_stack_with_NMT();
 
   JFR_ONLY(Jfr::on_thread_start(this);)
 
@@ -1491,8 +1491,8 @@ void WatcherThread::run() {
           os::die();
         }
 
-        // Wait a second, then recheck for timeout.
-        os::naked_short_sleep(999);
+        // Wait a bit, then recheck for timeout.
+        os::naked_short_sleep(250);
       }
     }
 
@@ -1611,6 +1611,7 @@ void JavaThread::initialize() {
   clear_must_deopt_id();
   set_monitor_chunks(NULL);
   set_next(NULL);
+  _in_asgct = false;
   _on_thread_list = false;
   _thread_state = _thread_new;
   _terminated = _not_terminated;
@@ -2631,10 +2632,7 @@ void JavaThread::create_stack_guard_pages() {
   } else {
     log_warning(os, thread)("Attempt to protect stack guard pages failed ("
       PTR_FORMAT "-" PTR_FORMAT ").", p2i(low_addr), p2i(low_addr + len));
-    if (os::uncommit_memory((char *) low_addr, len)) {
-      log_warning(os, thread)("Attempt to deallocate stack guard pages failed.");
-    }
-    return;
+    vm_exit_out_of_memory(len, OOM_MPROTECT_ERROR, "memory to guard stack pages");
   }
 
   log_debug(os, thread)("Thread " UINTX_FORMAT " stack guard pages activated: "
@@ -3227,6 +3225,25 @@ oop JavaThread::current_park_blocker() {
   return NULL;
 }
 
+// Print current stack trace for checked JNI warnings and JNI fatal errors.
+// This is the external format, selecting the platform
+// as applicable, and allowing for a native-only stack.
+void JavaThread::print_jni_stack() {
+  assert(this == JavaThread::current(), "Can't print stack of other threads");
+  if (!has_last_Java_frame()) {
+    ResourceMark rm(this);
+    char* buf = NEW_RESOURCE_ARRAY_RETURN_NULL(char, O_BUFLEN);
+    if (buf == NULL) {
+      tty->print_cr("Unable to print native stack - out of memory");
+      return;
+    }
+    frame f = os::current_frame();
+    VMError::print_native_stack(tty, f, this,
+                                buf, O_BUFLEN);
+  } else {
+    print_stack_on(tty);
+  }
+}
 
 void JavaThread::print_stack_on(outputStream* st) {
   if (!has_last_Java_frame()) return;

@@ -47,7 +47,7 @@ class TestVerifySubSetRunSystemGC {
 public class TestVerifySubSet {
 
     private static OutputAnalyzer runTest(String subset) throws Exception {
-        ArrayList<String> vmOpts = new ArrayList();
+        ArrayList<String> vmOpts = new ArrayList<>();
 
         Collections.addAll(vmOpts, Utils.getFilteredTestJavaOpts("-Xlog.*"));
         Collections.addAll(vmOpts, new String[] {"-XX:+UnlockDiagnosticVMOptions",
@@ -56,8 +56,7 @@ public class TestVerifySubSet {
                                                  "-Xlog:gc+verify=debug",
                                                  "-XX:VerifySubSet="+subset,
                                                  TestVerifySubSetRunSystemGC.class.getName()});
-        ProcessBuilder pb =
-            ProcessTools.createJavaProcessBuilder(vmOpts.toArray(new String[vmOpts.size()]));
+        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(vmOpts);
         OutputAnalyzer output = new OutputAnalyzer(pb.start());
 
         System.out.println("Output:\n" + output.getOutput());

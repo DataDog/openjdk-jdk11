@@ -2569,7 +2569,7 @@ encode %{
   enc_class aarch64_enc_ldrshw(iRegI dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrshw, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 2);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2577,7 +2577,7 @@ encode %{
   enc_class aarch64_enc_ldrsh(iRegI dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrsh, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 2);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2585,7 +2585,7 @@ encode %{
   enc_class aarch64_enc_ldrh(iRegI dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrh, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 2);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2593,7 +2593,7 @@ encode %{
   enc_class aarch64_enc_ldrh(iRegL dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrh, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 2);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2601,7 +2601,7 @@ encode %{
   enc_class aarch64_enc_ldrw(iRegI dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrw, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 4);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2609,7 +2609,7 @@ encode %{
   enc_class aarch64_enc_ldrw(iRegL dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrw, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 4);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2617,7 +2617,7 @@ encode %{
   enc_class aarch64_enc_ldrsw(iRegL dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldrsw, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 4);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -2625,7 +2625,7 @@ encode %{
   enc_class aarch64_enc_ldr(iRegL dst, memory mem) %{
     Register dst_reg = as_Register($dst$$reg);
     loadStore(MacroAssembler(&cbuf), &MacroAssembler::ldr, dst_reg, $mem->opcode(),
-               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp);
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 8);
   %}
 
   // This encoding class is generated automatically from ad_encode.m4.
@@ -3114,7 +3114,8 @@ encode %{
         __ mov_metadata(dst_reg, (Metadata*)con);
       } else {
         assert(rtype == relocInfo::none, "unexpected reloc type");
-        if (con < (address)(uintptr_t)os::vm_page_size()) {
+        if (! __ is_valid_AArch64_address(con) ||
+            con < (address)(uintptr_t)os::vm_page_size()) {
           __ mov(dst_reg, con);
         } else {
           uint64_t offset;
@@ -4435,6 +4436,16 @@ operand immFPacked()
 %{
   predicate(Assembler::operand_valid_for_float_immediate((double)n->getf()));
   match(ConF);
+  op_cost(0);
+  format %{ %}
+  interface(CONST_INTER);
+%}
+
+operand immI_positive()
+%{
+  predicate(n->get_int() > 0);
+  match(ConI);
+
   op_cost(0);
   format %{ %}
   interface(CONST_INTER);
@@ -13889,10 +13900,10 @@ instruct overflowAddL_reg_imm(rFlagsReg cr, iRegL op1, immLAddSub op2)
 %{
   match(Set cr (OverflowAddL op1 op2));
 
-  format %{ "cmn   $op1, $op2\t# overflow check long" %}
+  format %{ "adds  zr, $op1, $op2\t# overflow check long" %}
   ins_cost(INSN_COST);
   ins_encode %{
-    __ cmn($op1$$Register, $op2$$constant);
+    __ adds(zr, $op1$$Register, $op2$$constant);
   %}
 
   ins_pipe(icmp_reg_imm);
@@ -17432,7 +17443,7 @@ instruct vsll16B_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsra8B_imm(vecD dst, vecD src, immI shift) %{
+instruct vsra8B_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 4 ||
             n->as_Vector()->length() == 8);
   match(Set dst (RShiftVB src shift));
@@ -17447,7 +17458,7 @@ instruct vsra8B_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsra16B_imm(vecX dst, vecX src, immI shift) %{
+instruct vsra16B_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 16);
   match(Set dst (RShiftVB src shift));
   ins_cost(INSN_COST);
@@ -17461,7 +17472,7 @@ instruct vsra16B_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsrl8B_imm(vecD dst, vecD src, immI shift) %{
+instruct vsrl8B_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 4 ||
             n->as_Vector()->length() == 8);
   match(Set dst (URShiftVB src shift));
@@ -17481,7 +17492,7 @@ instruct vsrl8B_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsrl16B_imm(vecX dst, vecX src, immI shift) %{
+instruct vsrl16B_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 16);
   match(Set dst (URShiftVB src shift));
   ins_cost(INSN_COST);
@@ -17636,7 +17647,7 @@ instruct vsll8S_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsra4S_imm(vecD dst, vecD src, immI shift) %{
+instruct vsra4S_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2 ||
             n->as_Vector()->length() == 4);
   match(Set dst (RShiftVS src shift));
@@ -17651,7 +17662,7 @@ instruct vsra4S_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsra8S_imm(vecX dst, vecX src, immI shift) %{
+instruct vsra8S_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 8);
   match(Set dst (RShiftVS src shift));
   ins_cost(INSN_COST);
@@ -17665,7 +17676,7 @@ instruct vsra8S_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsrl4S_imm(vecD dst, vecD src, immI shift) %{
+instruct vsrl4S_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2 ||
             n->as_Vector()->length() == 4);
   match(Set dst (URShiftVS src shift));
@@ -17685,7 +17696,7 @@ instruct vsrl4S_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsrl8S_imm(vecX dst, vecX src, immI shift) %{
+instruct vsrl8S_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 8);
   match(Set dst (URShiftVS src shift));
   ins_cost(INSN_COST);
@@ -17824,7 +17835,7 @@ instruct vsll4I_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsra2I_imm(vecD dst, vecD src, immI shift) %{
+instruct vsra2I_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2);
   match(Set dst (RShiftVI src shift));
   ins_cost(INSN_COST);
@@ -17837,7 +17848,7 @@ instruct vsra2I_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsra4I_imm(vecX dst, vecX src, immI shift) %{
+instruct vsra4I_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 4);
   match(Set dst (RShiftVI src shift));
   ins_cost(INSN_COST);
@@ -17850,7 +17861,7 @@ instruct vsra4I_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsrl2I_imm(vecD dst, vecD src, immI shift) %{
+instruct vsrl2I_imm(vecD dst, vecD src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2);
   match(Set dst (URShiftVI src shift));
   ins_cost(INSN_COST);
@@ -17863,7 +17874,7 @@ instruct vsrl2I_imm(vecD dst, vecD src, immI shift) %{
   ins_pipe(vshift64_imm);
 %}
 
-instruct vsrl4I_imm(vecX dst, vecX src, immI shift) %{
+instruct vsrl4I_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 4);
   match(Set dst (URShiftVI src shift));
   ins_cost(INSN_COST);
@@ -17936,7 +17947,7 @@ instruct vsll2L_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsra2L_imm(vecX dst, vecX src, immI shift) %{
+instruct vsra2L_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2);
   match(Set dst (RShiftVL src shift));
   ins_cost(INSN_COST);
@@ -17949,7 +17960,7 @@ instruct vsra2L_imm(vecX dst, vecX src, immI shift) %{
   ins_pipe(vshift128_imm);
 %}
 
-instruct vsrl2L_imm(vecX dst, vecX src, immI shift) %{
+instruct vsrl2L_imm(vecX dst, vecX src, immI_positive shift) %{
   predicate(n->as_Vector()->length() == 2);
   match(Set dst (URShiftVL src shift));
   ins_cost(INSN_COST);

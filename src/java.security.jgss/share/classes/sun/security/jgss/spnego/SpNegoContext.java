@@ -242,8 +242,11 @@ public class SpNegoContext implements GSSContextSpi {
     }
 
     public final void dispose() throws GSSException {
-        mechContext = null;
         state = STATE_DELETED;
+        if (mechContext != null) {
+            mechContext.dispose();
+            mechContext = null;
+        }
     }
 
     /**
@@ -357,7 +360,7 @@ public class SpNegoContext implements GSSContextSpi {
                 // pull out mechanism
                 internal_mech = targToken.getSupportedMech();
                 if (internal_mech == null) {
-                    // return wth failure
+                    // return with failure
                     throw new GSSException(errorCode, -1,
                                 "supported mechanism from server is null");
                 }
@@ -695,7 +698,7 @@ public class SpNegoContext implements GSSContextSpi {
     }
 
     /**
-     * get ther DER encoded MechList
+     * get the DER encoded MechList
      */
     private byte[] getEncodedMechs(Oid[] mechSet)
         throws IOException, GSSException {
@@ -910,7 +913,7 @@ public class SpNegoContext implements GSSContextSpi {
     }
 
     /**
-     * This routine compares the recieved mechset to the mechset that
+     * This routine compares the received mechset to the mechset that
      * this server can support. It looks sequentially through the mechset
      * and the first one that matches what the server can support is
      * chosen as the negotiated mechanism. If one is found, negResult
