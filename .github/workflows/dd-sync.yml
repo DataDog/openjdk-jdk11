@@ -26,7 +26,7 @@ jobs:
       # 2. fetch upstream & copy it to a side branch
       - name: Update upstream-sync branch
         run: |
-          git remote add upstream https://github.com/openjdk/jdk.git
+          git remote add upstream https://github.com/openjdk/jdk11u-dev.git
           git fetch upstream master
           git checkout -B upstream-sync upstream/master
           git push -f origin upstream-sync
